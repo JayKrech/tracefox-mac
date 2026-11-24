@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uiTsg/Ga2YwO51f34448ROZWiaRkBxBl2iHZF4Nah9Q='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-m180Sksd0XEybeGAz/5EHekxABHWEhBpoJje0xchou0='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TraceFox</title>
 <style>
@@ -177,7 +177,7 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 /* content */
 .page{max-width:900px;margin:0 auto;padding:22px 28px 64px}
 .page.wide{max-width:1180px}
-.lt{font-size:26px;font-weight:700;line-height:1.16;letter-spacing:-.012em;margin:0 0 14px;text-wrap:balance;max-width:34ch}
+.lt{font-size:28px;font-weight:700;line-height:1.14;letter-spacing:-.022em;margin:0 0 16px;text-wrap:balance;max-width:30ch}
 .form{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 12px;margin:0;font-size:13px}
 .form dt{color:var(--label2);text-align:right}
 .form dd{margin:0}
@@ -196,11 +196,11 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .notice{display:flex;align-items:center;gap:9px;padding:8px 8px 8px 12px;border-radius:9px;background:var(--purple-tint);margin:18px 0 0;font-size:13px}
 .notice svg{width:16px;height:16px;color:var(--purple)}
 .notice .btn{margin-left:auto}
-.sec{margin:24px 0 0}
+.sec{margin:28px 0 0}
 .sec-h{display:flex;align-items:baseline;gap:7px;padding:0 2px}
-.sec-h h2{font-size:13px;font-weight:600;margin:0}
-.sec-h .n{color:var(--label2);font-size:11px;font-variant-numeric:tabular-nums}
-.sec-d{font-size:11px;color:var(--label2);margin:1px 2px 7px}
+.sec-h h2{font-size:15px;font-weight:600;letter-spacing:-.008em;margin:0}
+.sec-h .n{color:var(--label2);font-size:12px;font-variant-numeric:tabular-nums}
+.sec-d{font-size:12px;color:var(--label2);margin:2px 2px 9px}
 .group{background:var(--bg2);border-radius:10px;box-shadow:0 0 0 .5px var(--sep);overflow:hidden}
 .empty-row{padding:11px 14px;color:var(--label2)}
 .brow{display:grid;grid-template-columns:14px minmax(0,1fr) 196px;gap:8px 12px;align-items:start;padding:10px 14px 11px 10px}
@@ -222,7 +222,9 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none}
 .dot.sup{background:var(--green)}
 .dot.con{background:var(--red)}
-.bscore{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding-top:4px}
+.dot.zero{background:transparent;box-shadow:inset 0 0 0 1px var(--label3)}
+.bmeta .dots{font-variant-numeric:tabular-nums}
+.bscore{display:grid;grid-template-columns:108px minmax(0,1fr);gap:10px;align-items:center;padding-top:4px}
 .num{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ct,var(--label));white-space:nowrap;line-height:1}
 .num small{font-size:11px;font-weight:400;color:var(--label3);margin-left:1px}
 .lvl{position:relative;height:7px;border-radius:4px;background:var(--fill2);box-shadow:inset 0 0 0 .5px var(--sep)}
@@ -280,12 +282,12 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .drec .isub{margin:0 0 4px}
 .dchoice{font-size:13px;font-weight:600;margin:0;line-height:1.35}
 .dmeta{font-size:11px;color:var(--label2);margin:4px 0 0}
-.drs{font-size:12px;margin:6px 0 0;line-height:1.4}
+.drat{font-size:12px;margin:8px 0 0;line-height:1.45}
+.dlab{display:block;font-size:11px;color:var(--label2);margin-bottom:1px}
 .moved{list-style:none;margin:8px 0 0;padding:0}
 .moved li{font-size:12px;padding:5px 0;border-top:.5px solid var(--sep2)}
 .moved a{display:block}
-.moved span{font-size:11px;color:var(--label2)}
-.moved b{color:var(--orange-t)}
+.moved .tr{display:block;font-size:11px;margin-top:1px}
 .ctx{white-space:pre-line;font-size:12.5px;line-height:1.5;color:var(--label2);margin:6px 0 0;padding:8px 10px;border-radius:8px;background:var(--bg2);box-shadow:0 0 0 .5px var(--sep2)}
 .ctx mark{background:var(--purple-tint);color:var(--label);border-radius:3px;padding:0 1px}
 .ctxd{margin-top:6px;font-size:12px}
@@ -302,7 +304,9 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .guide li{padding:1px 0}
 .notice.warn{background:var(--orange-tint)}
 .notice.warn svg{color:var(--orange)}
-.chb{color:var(--accent-t);font-weight:500}
+.chb{color:var(--label);font-weight:500}
+.tr{color:var(--label2);white-space:nowrap}
+.tr b{color:var(--ct,var(--label));font-weight:600}
 .ctxd summary{color:var(--accent-t);cursor:default;width:max-content}
 .steps .rk{display:block;font-size:11px;color:var(--label2);margin-top:2px}
 .steps li .btn{margin:3px 0 0 -6px}
@@ -360,7 +364,9 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .steps{list-style:none;margin:0;padding:0}
 .steps li{font-size:12px;padding:5px 0;line-height:1.35}
 .steps li+li{border-top:.5px solid var(--sep2)}
-.steps a{display:block;font-size:11px;margin-top:2px}
+.steps a{display:block;font-size:11px;margin-top:3px;color:var(--label2)}
+.steps a::before{content:'↳ ';color:var(--label3)}
+.steps a:hover{color:var(--accent-t)}
 /* split views */
 .split{flex:1;min-height:0;display:grid;grid-template-columns:320px minmax(0,1fr)}
 .lcol{overflow:auto;border-right:.5px solid var(--sep);background:var(--bg)}
@@ -423,7 +429,9 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .stat{background:var(--bg2);padding:10px 14px}
 .stat b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
 .stat span{font-size:11px;color:var(--label2)}
-.moves .mv{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:8px 14px}
+.moves .mv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:9px 14px}
+.moves .mv>span>b{font-weight:500}
+.moves .mv small .tr{margin-right:8px}
 .moves .mv+.mv{border-top:.5px solid var(--sep)}
 .mvn{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mvn.up{color:var(--green-t)}
@@ -541,8 +549,8 @@ html{height:auto;overflow:visible}
 .fgrid{grid-template-columns:minmax(0,1fr);gap:4px}
 .fgrid>label,.fgrid>.lbl{text-align:left;padding-top:8px}
 .fgrid>.fe{grid-column:1}
-.moves .mv{grid-template-columns:64px minmax(0,1fr)}
-.moves time{grid-column:2}
+.moves .mv{grid-template-columns:minmax(0,1fr)}
+.moves time{grid-column:1}
 .stack thead{display:none}
 .stack tr{display:grid;padding:8px 0;border-bottom:.5px solid var(--sep2)}
 .stack td{display:flex;justify-content:space-between;gap:12px;padding:3px 12px;background:none!important}
@@ -587,6 +595,11 @@ const STEER=[/\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prio
   /\b(mark|rate|classify|label|treat) (this|every|all|the)\b[^.\n]{0,40}\bas (supported|strong|verified|true)\b/i,
   /\b(ignoriere|missachte|vergiss)\b[^.\n]{0,40}\b(anweisungen|instruktionen|vorgaben|regeln)\b/i,
   /\bdu bist (jetzt )?(eine?|der|die) (ki|assistent|sprachmodell)\b/i];
+/* One treatment for "evidence moved": where it came from in grey, where it landed in that level's colour. */
+const bandTone=b=>b==='Supported'?'known':b==='Contested'?'contested':'open';
+const moveTag=(from,to)=>`<span class="tr">${esc(from||'No evidence')} → <b class="t-${bandTone(to)}">${esc(to)}</b></span>`;
+/* A count with its dot. Zero gets a hollow dot: colour is reserved for something being there. */
+const dotc=(k,n,w)=>`<span class="dots"><span class="dot ${k}${n?'':' zero'}"></span>${n} ${w}</span>`;
 const steerMemo=new Map();
 function steers(x){if(!x)return '';const t=String(x.text||'');const k=(x.id||'')+'|'+t.length;if(steerMemo.has(k))return steerMemo.get(k);let hit='';for(const r of STEER){const m=t.match(r);if(m){hit=m[0].replace(/\s+/g,' ').slice(0,70);break}}if(steerMemo.size>500)steerMemo.clear();steerMemo.set(k,hit);return hit}
 const steerNote=(x,what)=>{const h=steers(x);return h?`<p class="steer" role="note">${I.warnFill}<span>This ${what} contains text that reads like instructions to an AI: “${esc(h)}”. Agents treat it as material, never as instructions. Read what they propose from it before you accept.</span></p>`:''};
@@ -835,7 +848,7 @@ function sidebar(){
 <div class="sb-scope-w"><button class="sb-scope" data-a="scopeMenu" aria-haspopup="menu" title="Choose a project">${g?I.folder:I.books}<span class="t">${esc(g?g.name:'All Projects')}</span>${I.down}</button></div>
 <nav class="sb-scroll" aria-label="${g?esc(g.name):'All projects'}">
 <div class="sb-sec">Workspace</div>
-${g?(()=>{const on=UI.view==='group'&&UI.gid===g.id;const n=on?0:changesSince(g.id,seenGet()[g.id]).length;return sbRow('#g-'+g.id,I.folder,'Overview',n||'',n?'hot':'',on,'group',g.id,n?plural(n,'change')+' since your last visit':'')})():''}
+${g?(()=>{const on=UI.view==='group'&&UI.gid===g.id;const n=on?0:changesSince(g.id,seenGet()[g.id]).length;return sbRow('#g-'+g.id,I.folder,'Overview',n||'','',on,'group',g.id,n?plural(n,'change')+' since your last visit':'')})():''}
 ${sbRow('#review',I.tray,'Review',pend||'',pend?'hot':'',UI.view==='review')}
 ${sbRow('#sources',I.doc,'Sources',scopeSources().length,'',UI.view==='sources')}
 ${sbRow('#ledger',I.books,'Belief Ledger',scopeBeliefs().length,'',UI.view==='ledger')}
@@ -919,7 +932,7 @@ function beliefRow(b,sc,pid){
   const nxt=sc.bucket!=='supported'?(b.riskAccepted?'<span class="cap">Risk Accepted</span>':String(b.nextStep||'').trim()?`<span>Next: ${esc(cut(b.nextStep,70))}${b.passIf?' · pass if '+esc(cut(b.passIf,60)):''}</span>`:''):'';
   return `<div class="brow t-${t}" id="bel-${esc(b.id)}" data-a="toggle" data-id="${esc(b.id)}" data-p="${esc(pid)}" data-menu="belief" role="button" tabindex="0" aria-expanded="${open}" aria-label="${esc(b.statement)}. ${esc(sc.band)}.">
 <span class="disc">${I.tri}</span>
-<div><div class="bstmt">${esc(b.statement)}</div><div class="bmeta">${b.loadBearing?'<span class="cap lb">Load-Bearing</span>':''}${np?`<span class="cap purple">${np} to Review</span>`:''}${sc.broken.length?`<span class="cap orange">${plural(sc.broken.length,'Broken Quote')}</span>`:''}${sc.oneSeg?`<span class="cap orange" title="All supporting evidence comes from ${esc(sc.oneSeg)}. Check another segment before generalising.">One Segment</span>`:''}${sc.staleAny?'<span class="cap orange">Stale Evidence</span>':''}<span class="dots"><span class="dot sup"></span>${sc.sup} supporting</span><span class="dots"><span class="dot con"></span>${sc.con} contradicting</span>${nxt}</div></div>
+<div><div class="bstmt">${esc(b.statement)}</div><div class="bmeta">${b.loadBearing?'<span class="cap lb">Load-Bearing</span>':''}${np?`<span class="cap purple">${np} to Review</span>`:''}${sc.broken.length?`<span class="cap orange">${plural(sc.broken.length,'Broken Quote')}</span>`:''}${sc.oneSeg?`<span class="cap orange" title="All supporting evidence comes from ${esc(sc.oneSeg)}. Check another segment before generalising.">One Segment</span>`:''}${sc.staleAny?'<span class="cap orange">Stale Evidence</span>':''}${dotc('sup',sc.sup,'supporting')}${dotc('con',sc.con,'contradicting')}${nxt}</div></div>
 <div class="bscore" title="${esc(scoreTip(sc))}">${lvlBar(sc)}${bandTag(sc)}</div>
 </div>${open?evidence(b,sc,pid):''}`;
 }
@@ -960,7 +973,7 @@ function related(pid){
 }
 function decisionRecord(p,R,pid){
   const C=p.committed;
-  return `<div class="drec"><p class="isub">Decision Record</p>${C.choice?`<p class="dchoice">${esc(C.choice)}</p>`:'<p class="dchoice muted">Decision not recorded</p>'}<p class="dmeta">Signed off by ${esc(C.by)}, ${esc(fmtDate(C.at))}</p>${C.rationale?`<p class="drs">${esc(C.rationale)}</p>`:''}${C.options?`<p class="drs"><b>Options considered:</b> ${esc(C.options)}</p>`:''}${R.moved.length?`<ul class="moved">${R.moved.map(x=>`<li><a href="#p-${pid}" data-a="gotoBelief" data-id="${esc(x.b.id)}" data-p="${pid}">${esc(cut(x.b.statement,90))}</a><span>${esc(x.from)} → <b>${esc(x.to)}</b></span></li>`).join('')}</ul>`:''}${Array.isArray(C.watch)?`<p class="dmeta">Reopens if ${C.watch.length===1?'its watched belief changes':'any of '+C.watch.length+' watched beliefs change'} evidence level.</p>`:''}</div>`;
+  return `<div class="drec"><p class="isub">Decision Record</p>${C.choice?`<p class="dchoice">${esc(C.choice)}</p>`:'<p class="dchoice muted">Decision not recorded</p>'}<p class="dmeta">Signed off by ${esc(C.by)}, ${esc(fmtDate(C.at))}</p>${C.rationale?`<p class="drat">${esc(C.rationale)}</p>`:''}${C.options?`<p class="drat"><span class="dlab">Options considered</span>${esc(C.options)}</p>`:''}${R.moved.length?`<ul class="moved">${R.moved.map(x=>`<li><a href="#p-${pid}" data-a="gotoBelief" data-id="${esc(x.b.id)}" data-p="${pid}">${esc(cut(x.b.statement,90))}</a>${moveTag(x.from,x.to)}</li>`).join('')}</ul>`:''}${Array.isArray(C.watch)?`<p class="dmeta">Reopens if ${C.watch.length===1?'its watched belief changes':'any of '+C.watch.length+' watched beliefs change'} evidence level.</p>`:''}</div>`;
 }
 function inspector(pid){
   const p=S.projects[pid];const R=readiness(pid);const w=canWrite?'':'disabled';const ai=canWrite&&aiOn&&!busy?'':'disabled';
@@ -988,7 +1001,7 @@ const seenGet=()=>{try{return JSON.parse(localStorage.getItem('tracefox.seen')||
 function changesSince(gid,since){
   if(!since)return [];const t=toTime(since);const qs=questionsIn(gid);const qids=new Set(qs.map(q=>q.id));const ev=[];
   const bs=activeBeliefs().filter(b=>(b.projectIds||[]).some(id=>qids.has(id)));const pidOf=b=>(b.projectIds||[]).find(id=>qids.has(id));
-  bs.forEach(b=>{const h=b.history||[];for(let i=0;i<h.length;i++){if(!(toTime(h[i].at)>t))continue;const from=i?h[i-1].band:'No evidence',to=h[i].band;if(to&&from!==to)ev.push({at:h[i].at,href:'#p-'+pidOf(b),b,title:b.statement,what:`${from||'No evidence'} → ${to}`,note:h[i].note})}});
+  bs.forEach(b=>{const h=b.history||[];for(let i=0;i<h.length;i++){if(!(toTime(h[i].at)>t))continue;const from=i?h[i-1].band:'No evidence',to=h[i].band;if(to&&from!==to)ev.push({at:h[i].at,href:'#p-'+pidOf(b),b,title:b.statement,what:`${from||'No evidence'} → ${to}`,from:from||'No evidence',to,note:h[i].note})}});
   qs.forEach(q=>{const np=Object.values(S.links).filter(l=>l.status==='proposed'&&toTime(l.createdAt)>t&&beliefsOf(q.id).some(b=>b.id===l.beliefId));const nb=propBeliefs().filter(b=>toTime(b.createdAt)>t&&(b.projectIds||[]).includes(q.id));
     if(np.length||nb.length)ev.push({at:[...np.map(l=>l.createdAt),...nb.map(b=>b.createdAt)].sort().pop(),href:'#p-'+q.id,title:q.question,what:[nb.length?plural(nb.length,'proposed belief'):'',np.length?plural(np.length,'proposed passage'):''].filter(Boolean).join(', ')+' to review'});
     if(q.committed&&toTime(q.committed.at)>t)ev.push({at:q.committed.at,href:'#p-'+q.id,title:q.question,what:'Signed off by '+q.committed.by});});
@@ -1004,7 +1017,7 @@ function groupView(){
 ${g.description?`<p class="gdesc">${esc(g.description)}</p>`:''}
 ${g.example?'<p class="foot">Sample project: the company, people and research are made up.</p>':''}
 ${(()=>{const ro=questionsIn(g.id).filter(q=>readiness(q.id).state==='reopen');const prev=UI.seenPrev;const ch=prev?changesSince(g.id,prev):[];
-  return (ro.length?`<div class="notice warn">${I.warnFill}<span>${ro.length===1?'A signed-off decision needs reopening: '+esc(cut(ro[0].question,80)):plural(ro.length,'signed-off decision')+' need reopening'}</span><a class="btn sm" href="#p-${esc(ro[0].id)}">Open</a></div>`:'')+(prev?`<section class="sec" aria-label="Since your last visit"><div class="sec-h"><h2>Since Your Last Visit</h2><span class="n">${ch.length||''}</span><span class="sec-b muted" style="font-size:11px">${esc(fmtShort(prev))}</span></div>${ch.length?`<div class="group">${ch.slice(0,8).map(e=>`<a class="qrow chg" href="${esc(e.href)}"><div><b>${esc(cut(e.title,110))}</b><div class="bmeta"><span class="${e.b?'chb':''}">${esc(e.what)}</span>${e.note?`<span>${esc(cut(e.note,70))}</span>`:''}<span>${esc(fmtShort(e.at))}</span></div></div><span class="s2">${I.chevR}</span></a>`).join('')}</div>${ch.length>8?`<p class="sec-d" style="margin-top:6px">And ${ch.length-8} more.</p>`:''}`:'<p class="sec-d">Nothing has changed since then.</p>'}</section>`:'');})()}
+  return (ro.length?`<div class="notice warn">${I.warnFill}<span>${ro.length===1?'A signed-off decision needs reopening: '+esc(cut(ro[0].question,80)):plural(ro.length,'signed-off decision')+' need reopening'}</span><a class="btn sm" href="#p-${esc(ro[0].id)}">Open</a></div>`:'')+(prev?`<section class="sec" aria-label="Since your last visit"><div class="sec-h"><h2>Since Your Last Visit</h2><span class="n">${ch.length||''}</span><span class="sec-b muted" style="font-size:11px">${esc(fmtShort(prev))}</span></div>${ch.length?`<div class="group">${ch.slice(0,8).map(e=>`<a class="qrow chg" href="${esc(e.href)}"><div><b>${esc(cut(e.title,110))}</b><div class="bmeta">${e.to?moveTag(e.from,e.to):`<span class="chb">${esc(e.what)}</span>`}${e.note?`<span>${esc(cut(e.note,70))}</span>`:''}<span>${esc(fmtShort(e.at))}</span></div></div><span class="s2">${I.chevR}</span></a>`).join('')}</div>${ch.length>8?`<p class="sec-d" style="margin-top:6px">And ${ch.length-8} more.</p>`:''}`:'<p class="sec-d">Nothing has changed since then.</p>'}</section>`:'');})()}
 <section class="sec" aria-label="Questions"><div class="sec-h"><h2>Questions</h2><span class="n">${qs.length}</span><span class="sec-b"><button class="btn sm" data-a="newProject" data-g="${esc(g.id)}" ${w}>New Question…</button></span></div><p class="sec-d">Each question carries its own beliefs, evidence and sign-off.</p>
 <div class="group">${qs.length?qs.map(p=>{const r=readiness(p.id);const n=r.bs.length,sup=r.bs.filter(b=>r.sc[b.id].bucket==='supported').length;return `<a class="qrow" href="#p-${esc(p.id)}" data-menu="question" data-p="${esc(p.id)}"><div><b>${esc(p.question)}</b><div class="bmeta">${stateCap(r)}<span>${n?sup+' of '+plural(n,'belief')+' supported':'No beliefs yet'}</span>${p.deadline?`<span>Decide by ${esc(fmtDate(p.deadline))}</span>`:''}</div></div><span class="s2">${I.chevR}</span></a>`}).join(''):'<div class="empty-row">No questions yet. Ask the first one this project needs to answer.</div>'}</div></section>
 <section class="sec" aria-label="Context files"><div class="sec-h"><h2>Context Files</h2><span class="n">${fs.length}</span><span class="sec-b">${driveOn?`<button class="btn sm" data-a="importDrive" data-g="${esc(g.id)}" ${w}>From Google Drive…</button>`:''}<button class="btn sm" data-a="addContext" data-g="${esc(g.id)}" ${w}>Add File…</button></span></div><p class="sec-d">Strategy docs, product one-pagers, PRDs. The agents read them as background when they frame beliefs and draft summaries. Context never counts as evidence.</p>
@@ -1101,7 +1114,7 @@ function ledgerView(){
   const th=(k,label,num)=>`<th class="${num?'num':''}" aria-sort="${UI.sort===k?(UI.sdir>0?'ascending':'descending'):'none'}"><button class="thb${UI.sort===k?' on':''}" data-a="sortBy" data-k="${k}">${label}${UI.sort===k?(UI.sdir>0?I.up:I.down):''}</button></th>`;
   return `<div class="page wide">
 <div class="stats"><div class="stat"><b>${all.length}</b><span>Beliefs</span></div><div class="stat"><b>${n(r=>r.s.bucket==='supported')}</b><span>Supported</span></div><div class="stat"><b>${n(r=>r.s.unresolved)}</b><span>Contested</span></div><div class="stat"><b>${n(r=>r.s.staleAny)}</b><span>Rely on stale evidence</span></div><div class="stat"><b>${n(r=>!(r.b.projectIds||[]).length)}</b><span>Not attached</span></div></div>
-${moves.length?`<h2 class="h2b">Recent Movement</h2><div class="group moves" style="margin-bottom:22px">${moves.slice(0,6).map(m=>`<div class="mv"><span class="mvn ${m.d>0?'up':'down'}">${m.from.band&&m.to.band&&m.from.band!==m.to.band?esc(m.from.band)+' → '+esc(m.to.band):(m.d>0?'+':'−')+Math.abs(m.d)+' pts'}</span><span>${esc(m.b.statement)}<small>${esc(m.note||'')}</small></span><time datetime="${esc(m.at)}">${esc(fmtShort(m.at))}</time></div>`).join('')}</div>`:''}
+${moves.length?`<h2 class="h2b">Recent Movement</h2><div class="group moves" style="margin-bottom:22px">${moves.slice(0,6).map(m=>`<div class="mv"><span><b>${esc(m.b.statement)}</b><small>${m.from.band&&m.to.band&&m.from.band!==m.to.band?moveTag(m.from.band,m.to.band):`<span class="tr mvn ${m.d>0?'up':'down'}">${(m.d>0?'+':'−')+Math.abs(m.d)+' pts'}</span>`}${m.note?' '+esc(m.note):''}</small></span><time datetime="${esc(m.at)}">${esc(fmtShort(m.at))}</time></div>`).join('')}</div>`:''}
 <h2 class="h2b">All Beliefs</h2>
 ${rows.length?`<div class="tblw scroll"><table class="tbl stack"><thead><tr>${th('stmt','Belief')}${th('q','Question')}${th('conf','Evidence Strength')}${th('ev','Passages',1)}</tr></thead><tbody>${rows.map(r=>{const b=r.b,s=r.s;const pid=(b.projectIds||[])[0];
 return `<tr data-menu="ledger" data-id="${esc(b.id)}" data-p="${esc(pid||'')}"><td data-l="Belief">${pid?`<a class="belink" href="#p-${esc(pid)}" data-a="gotoBelief" data-id="${esc(b.id)}" data-p="${esc(pid)}">${esc(b.statement)}</a>`:esc(b.statement)}${b.loadBearing||s.staleAny||s.broken.length?`<div class="bmeta">${b.loadBearing?'<span class="cap lb">Load-Bearing</span>':''}${s.staleAny?'<span class="cap orange">Stale Evidence</span>':''}${s.broken.length?'<span class="cap orange">Broken Quote</span>':''}</div>`:''}</td>
