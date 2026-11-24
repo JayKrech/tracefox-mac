@@ -1,10 +1,11 @@
 # Builds the TraceFox disk image on a GitHub Mac.
 #
-#   Push a tag like v1.0.0  -> signed, notarized TraceFox.dmg, attached to a GitHub release
-#   Run it by hand (Actions > Release > Run workflow) -> a DMG to download from the run page;
-#     signed and notarized if the signing secrets are set, otherwise signed ad hoc for testing
+#   Push a tag like v1.0.0  -> TraceFox.dmg, attached to a GitHub release
+#   Run it by hand (Actions > Release > Run workflow) -> a DMG to download from the run page
 #
-# The signing secrets are described in docs/RELEASING.md.
+# Signing: with the repository variable SIGN_RELEASES set to true (and the secrets described in
+# docs/RELEASING.md), the app is signed with a Developer ID and notarized by Apple. Without it,
+# the app is signed ad hoc, and macOS asks once before the first launch.
 name: Release
 
 on:
@@ -28,7 +29,7 @@ jobs:
     permissions:
       contents: write
     env:
-      HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' }}
+      HAS_CERT: ${{ vars.SIGN_RELEASES == 'true' && secrets.MACOS_CERTIFICATE_P12_BASE64 != '' }}
       IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,10 +49,10 @@ jobs:
             exit 1
           fi
 
-      - name: Stop a release that cannot be signed
-        if: env.IS_TAG == 'true' && env.HAS_CERT != 'true'
+      - name: Stop a signed release without its secrets
+        if: vars.SIGN_RELEASES == 'true' && env.HAS_CERT != 'true'
         run: |
-          echo "::error::The signing secrets are missing, so this release would not open on other Macs. See docs/RELEASING.md."
+          echo "::error::SIGN_RELEASES is true, but MACOS_CERTIFICATE_P12_BASE64 is missing. See docs/RELEASING.md."
           exit 1
 
       - name: Unit tests
@@ -92,7 +93,7 @@ jobs:
           fi
           bash scripts/release-mac.sh
 
-      - name: Build a test image (ad-hoc signature)
+      - name: Build the disk image (ad-hoc signature)
         if: env.HAS_CERT != 'true'
         run: bash scripts/build-dmg.sh
 
@@ -119,8 +120,21 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/TraceFox.dmg dist/TraceFox.dmg.sha256 --clobber
           else
+            if [ "$HAS_CERT" = "true" ]; then
+              echo "Signed with a Developer ID and notarized by Apple." > notes.md
+            else
+              {
+                echo "**Opening TraceFox for the first time.** This version is not yet notarized by Apple, so macOS stops it once:"
+                echo ""
+                echo "1. Drag TraceFox into Applications and open it. macOS says it can't verify the app. Click **Done**."
+                echo "2. Open **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to TraceFox."
+                echo "3. Confirm with your password. From then on TraceFox opens normally."
+                echo ""
+                echo "The download is built by GitHub Actions from the code in this repository. Its checksum is in \`TraceFox.dmg.sha256\`."
+              } > notes.md
+            fi
             gh release create "$GITHUB_REF_NAME" dist/TraceFox.dmg dist/TraceFox.dmg.sha256 \
-              --title "TraceFox ${GITHUB_REF_NAME#v}" --generate-notes
+              --title "TraceFox ${GITHUB_REF_NAME#v}" --notes-file notes.md --generate-notes
           fi
 
       - name: Remove the signing keychain

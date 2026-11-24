@@ -10,7 +10,10 @@ https://github.com/JayKrech/tracefox-mac/releases/latest/download/TraceFox.dmg
 
 which always points to the newest release. The link only works while the repository is public.
 
-## One-time setup
+## Signing and notarization (optional)
+
+Without this, releases are signed ad hoc and macOS asks once before the first launch. To sign and notarize, set the secrets below and then the repository **variable** `SIGN_RELEASES` to `true` (Settings › Secrets and variables › Actions › Variables).
+
 
 You need a paid Apple Developer membership. All four values below go into the repository under **Settings › Secrets and variables › Actions › New repository secret**. Nobody can read a secret back once it is saved, not even you.
 

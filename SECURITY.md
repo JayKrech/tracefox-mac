@@ -24,7 +24,8 @@ Please report security problems privately, not in a public issue: open the **Sec
 - Text from your sources and from the agents is always shown as text. `test/xss.test.cjs` fills every field and every agent reply with hostile markup and checks that none of it is rendered.
 - Windows cannot navigate away from the app's own pages. Web links open in your browser, and only `https` links.
 - The packaged app cannot be started as a plain Node.js runtime, with a debugger, or with other code than its own archive (Electron fuses), and its code is checked against a hash recorded at build time.
-- Releases are built by GitHub Actions from this repository, signed with a Developer ID and notarized by Apple. The build starts the packaged app in a self-test before it is published.
+- Releases are built by GitHub Actions from this repository, never on a personal computer, and each comes with a SHA-256 checksum. The build starts the packaged app in a self-test before it is published.
+- Version 1.0.0 is signed ad hoc and not yet notarized by Apple, so macOS asks once before the first launch (System Settings › Privacy & Security › Open Anyway). Notarized releases will follow.
 
 ## Limits you should know
 

@@ -22,7 +22,8 @@ TraceFox is a free Mac app for product teams. You write down the decision you ar
 
 1. Download [TraceFox.dmg](https://github.com/JayKrech/tracefox-mac/releases/latest/download/TraceFox.dmg).
 2. Open it and drag TraceFox into Applications.
-3. Open TraceFox. Choose **TraceFox › Settings…** (⌘,) and paste an Anthropic API key. You can create one at <https://console.anthropic.com/settings/keys>.
+3. Open TraceFox. This version is not yet notarized by Apple, so the first time macOS says it can't verify the app. Click **Done**, open **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to TraceFox. You only do this once.
+4. Choose **TraceFox › Settings…** (⌘,) and paste an Anthropic API key. You can create one at <https://console.anthropic.com/settings/keys>.
 
 Requires macOS 12 or later, on Apple silicon or Intel.
 
@@ -54,7 +55,7 @@ npm run dmg
 
 It is signed ad hoc: it opens on your Mac, and other Macs ask for permission once under System Settings › Privacy & Security.
 
-How the official download is built, signed and notarized is described in [docs/RELEASING.md](docs/RELEASING.md).
+How the official download is built, and how signing and notarization are set up, is described in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## What's inside
 
