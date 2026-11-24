@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
+<title>Settings</title>
+<style>
+:root{color-scheme:light dark;--label:light-dark(#1d1d1f,#f5f5f7);--label2:light-dark(#6e6e73,#a1a1a6);--sep:light-dark(rgba(0,0,0,.1),rgba(255,255,255,.12));--box:light-dark(rgba(255,255,255,.7),rgba(255,255,255,.05));--accent:#0a84ff;--green:light-dark(#248a3d,#30d158);--red:light-dark(#d70015,#ff453a)}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;color:var(--label);background:light-dark(#ececec,#2a2a2a);-webkit-user-select:none;user-select:none}
+main{padding:20px 22px 18px}
+h2{font-size:13px;font-weight:600;margin:0 0 6px}
+.box{background:var(--box);border-radius:10px;box-shadow:0 0 0 .5px var(--sep);padding:12px 14px;margin-bottom:16px}
+p{margin:0}
+.muted{color:var(--label2);font-size:11px}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px}
+input[type=password],input[type=text]{flex:1;height:24px;padding:0 8px;border-radius:6px;border:0;box-shadow:0 0 0 .5px light-dark(rgba(0,0,0,.25),rgba(255,255,255,.2)),inset 0 .5px 1px rgba(0,0,0,.06);background:light-dark(#fff,rgba(255,255,255,.08));color:var(--label);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-user-select:text;user-select:text;outline:none}
+input:focus{box-shadow:0 0 0 3px rgba(10,132,255,.45)}
+button{height:24px;padding:0 12px;border-radius:6px;border:0;font:inherit;background:light-dark(#fff,rgba(255,255,255,.14));color:var(--label);box-shadow:0 0 0 .5px light-dark(rgba(0,0,0,.18),rgba(255,255,255,.1)),0 .5px 1px rgba(0,0,0,.08)}
+button.def{background:var(--accent);color:#fff;box-shadow:none}
+button.link{background:none;box-shadow:none;color:var(--accent);padding:0}
+button:disabled{opacity:.45}
+.status{display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--label2)}
+.dot.on{background:var(--green)}
+.msg{min-height:16px;margin-top:6px;font-size:11px}
+.msg.ok{color:var(--green)}.msg.err{color:var(--red)}
+label.m{display:flex;gap:8px;align-items:flex-start;padding:5px 0}
+label.m small{display:block;color:var(--label2);font-size:11px}
+.path{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--label2);word-break:break-all;-webkit-user-select:text;user-select:text;margin-top:4px}
+</style>
+</head>
+<body>
+<main>
+<h2>Anthropic API Key</h2>
+<div class="box">
+  <div class="status"><span class="dot" id="dot"></span><span id="status">Checking…</span></div>
+  <p class="muted" style="margin-top:4px">TraceFox’s agents run on your own key. It’s encrypted with your Mac’s Keychain and sent only to Anthropic.</p>
+  <div class="row"><label for="key" style="position:absolute;left:-9999px">API key</label><input id="key" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button id="test">Test</button><button id="save" class="def">Save</button></div>
+  <p class="msg" id="msg" role="status"></p>
+  <div class="row" style="margin-top:2px;justify-content:space-between"><button class="link" id="get">Get a key in the Anthropic Console</button><button class="link" id="remove" hidden>Remove Key</button></div>
+</div>
+<h2>Model</h2>
+<div class="box" id="models"></div>
+<h2>Your Data</h2>
+<div class="box">
+  <p>Questions, sources and evidence are saved on this Mac.</p>
+  <p class="path" id="path"></p>
+  <div class="row"><button id="reveal">Show in Finder</button><span class="muted" id="ver"></span></div>
+</div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const T = window.tfSettings;
+const say = (text, cls) => { const m = $('#msg'); m.textContent = text || ''; m.className = 'msg ' + (cls || ''); };
+const errText = e => !e ? 'Something went wrong.' : e.code === 'invalid_key' ? (e.message && e.message.includes('sk-ant-') ? e.message : 'Anthropic didn’t accept this key.') : e.code === 'network' ? 'Couldn’t reach Anthropic. Check your connection.' : e.code === 'billing' ? 'This account has no credit left.' : (e.message || 'Something went wrong.');
+async function load() {
+  const s = await T.state();
+  $('#dot').classList.toggle('on', s.hasKey);
+  $('#status').textContent = s.hasKey ? 'Key saved: ' + s.keyHint : 'No key saved yet';
+  $('#remove').hidden = !s.hasKey;
+  $('#path').textContent = s.dataPath;
+  $('#ver').textContent = 'TraceFox ' + s.version;
+  $('#models').innerHTML = '';
+  s.models.forEach(m => {
+    const l = document.createElement('label'); l.className = 'm';
+    const i = document.createElement('input'); i.type = 'radio'; i.name = 'model'; i.value = m.id; i.checked = m.id === s.model;
+    i.addEventListener('change', () => T.setModel(m.id));
+    const sp = document.createElement('span'); sp.textContent = m.label;
+    const sm = document.createElement('small'); sm.textContent = m.note; sp.appendChild(sm);
+    l.append(i, sp); $('#models').appendChild(l);
+  });
+}
+$('#save').addEventListener('click', async () => {
+  const k = $('#key').value.trim(); if (!k) { say('Paste your key first.', 'err'); return; }
+  if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) { say('That doesn’t look like an Anthropic API key. Keys start with “sk-ant-”.', 'err'); return; }
+  say('Checking the key…');
+  const t = await T.testKey(k);
+  if (!t.ok && t.error && t.error.code !== 'network') { say(errText(t.error), 'err'); return; }
+  const r = await T.saveKey(k);
+  if (!r.ok) { say(errText(r.error), 'err'); return; }
+  $('#key').value = ''; say(t.ok ? 'Saved. The agents are ready.' : 'Saved, but Anthropic couldn’t be reached to check it.', t.ok ? 'ok' : 'err'); load();
+});
+$('#test').addEventListener('click', async () => {
+  const k = $('#key').value.trim(); say('Checking…');
+  const r = await T.testKey(k || null);
+  say(r.ok ? 'The key works.' : errText(r.error), r.ok ? 'ok' : 'err');
+});
+$('#key').addEventListener('keydown', e => { if (e.key === 'Enter') $('#save').click(); if (e.key === 'Escape') T.close(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') T.close(); });
+$('#remove').addEventListener('click', async () => { await T.removeKey(); say('Key removed. The agents are off until you add one.'); load(); });
+$('#get').addEventListener('click', () => T.openKeys());
+$('#reveal').addEventListener('click', () => T.revealData());
+load();
+</script>
+</body>
+</html>

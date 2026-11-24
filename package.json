@@ -1,0 +1,30 @@
+{
+  "name": "tracefox",
+  "version": "1.0.0",
+  "description": "Evidence for every product decision. The TraceFox app for macOS.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/ai.test.cjs",
+    "test:e2e": "node test/app.test.cjs",
+    "package:mac": "node scripts/package-mac.mjs",
+    "dmg": "bash scripts/build-dmg.sh",
+    "release:mac": "bash scripts/release-mac.sh"
+  },
+  "author": "Jakob Ehe",
+  "license": "FSL-1.1-MIT",
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^45.4.1"
+  },
+  "productName": "TraceFox",
+  "private": true,
+  "homepage": "https://tracefox.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JayKrech/tracefox-mac.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

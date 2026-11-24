@@ -1,0 +1,6 @@
+node_modules/
+out/
+test/shots/
+build.log
+*.dmg
+.DS_Store

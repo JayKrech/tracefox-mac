@@ -1,0 +1,121 @@
+# Builds the TraceFox disk image on a GitHub Mac.
+#
+#   Push a tag like v1.0.0  -> signed, notarized TraceFox.dmg, attached to a GitHub release
+#   Run it by hand (Actions > Release > Run workflow) -> a DMG to download from the run page;
+#     signed and notarized if the signing secrets are set, otherwise signed ad hoc for testing
+#
+# The signing secrets are described in docs/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    name: Build the Mac disk image
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' }}
+      IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Check the tag against package.json
+        if: env.IS_TAG == 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $VERSION in package.json."
+            exit 1
+          fi
+
+      - name: Stop a release that cannot be signed
+        if: env.IS_TAG == 'true' && env.HAS_CERT != 'true'
+        run: |
+          echo "::error::The signing secrets are missing, so this release would not open on other Macs. See docs/RELEASING.md."
+          exit 1
+
+      - name: Unit tests
+        run: |
+          npm ci
+          npm test
+
+      - name: Import the Developer ID certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/tracefox-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          echo "SIGN_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build, sign and notarize
+        if: env.HAS_CERT == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ]; then
+            echo "::error::APPLE_ID, APPLE_TEAM_ID or APPLE_APP_SPECIFIC_PASSWORD is missing. See docs/RELEASING.md."
+            exit 1
+          fi
+          bash scripts/release-mac.sh
+
+      - name: Build a test image (ad-hoc signature)
+        if: env.HAS_CERT != 'true'
+        run: bash scripts/build-dmg.sh
+
+      - name: Collect the disk image
+        run: |
+          mkdir -p dist
+          cp out/TraceFox-*.dmg dist/TraceFox.dmg
+          ls -lh dist
+          shasum -a 256 dist/TraceFox.dmg | tee dist/TraceFox.dmg.sha256
+          [ -f build.log ] && cp build.log dist/ || true
+
+      - name: Keep the disk image with this run
+        uses: actions/upload-artifact@v7
+        with:
+          name: TraceFox-dmg
+          path: dist/
+          retention-days: 14
+
+      - name: Publish the GitHub release
+        if: env.IS_TAG == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/TraceFox.dmg dist/TraceFox.dmg.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/TraceFox.dmg dist/TraceFox.dmg.sha256 \
+              --title "TraceFox ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
+
+      - name: Remove the signing keychain
+        if: always() && env.SIGN_KEYCHAIN != ''
+        run: security delete-keychain "$SIGN_KEYCHAIN" || true
