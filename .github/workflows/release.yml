@@ -11,6 +11,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 # Read-only by default. Only the job below may write, and only to publish the release.
