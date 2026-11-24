@@ -83,6 +83,45 @@ const menu = (appx, label) => appx.evaluate(({ Menu }, label) => {
   await page.screenshot({ path: SHOTS + '/3-agents.png' });
   await appx.close();
 
+  // one-time notice before the first agent run (the test answers it instead of a person)
+  fs.rmSync(path.join(DATA, 'settings.json'), { force: true });
+  ({ appx, page } = await launch({ TF_FAKE_AI: '1', TF_AGENT_NOTICE: 'decline' }));
+  await page.waitForSelector('#bel-b1');
+  const before = await page.locator('.prow').count();
+  await page.click('#tb [data-a=moreBrief]'); await page.click('#menu .mi:text-is("Propose Beliefs")'); await wait(900);
+  const settings = () => { try { return JSON.parse(fs.readFileSync(path.join(DATA, 'settings.json'), 'utf8')); } catch (e) { return {}; } };
+  ok((await page.locator('.prow').count()) === before && !settings().agentNotice, 'declining the notice sends nothing and proposes nothing');
+  await appx.evaluate(() => { process.env.TF_AGENT_NOTICE = 'accept'; });
+  await page.click('#tb [data-a=moreBrief]'); await page.click('#menu .mi:text-is("Propose Beliefs")');
+  await page.waitForSelector('.activity', { state: 'detached' }); await wait(500);
+  ok(settings().agentNotice === true, 'accepting the notice is remembered');
+  ok(await appx.evaluate(({ Menu }) => { const all = items => items.flatMap(i => [i.label, ...(i.submenu ? all(i.submenu.items) : [])]); const l = all(Menu.getApplicationMenu().items); return l.includes('Check for Updates…') && l.includes('How TraceFox Protects Your Data'); }), 'menu offers Check for Updates and the data protection page');
+  await appx.close();
+
+  // a copy of the workspace per day
+  const backups = fs.existsSync(path.join(DATA, 'backups')) ? fs.readdirSync(path.join(DATA, 'backups')) : [];
+  ok(backups.length === 1 && /^workspace-\d{4}-\d{2}-\d{2}\.json$/.test(backups[0]) && Object.keys(JSON.parse(fs.readFileSync(path.join(DATA, 'backups', backups[0]), 'utf8')).tf_beliefs).length === 7, 'a daily backup of the workspace is kept');
+
+  // an unreadable workspace file is kept aside, never overwritten
+  const BAD = fs.mkdtempSync(path.join(os.tmpdir(), 'tf-desk-bad-'));
+  fs.writeFileSync(path.join(BAD, 'workspace.json'), '{"tf_projects": {"p1": {"question": "Half a fi');
+  ({ appx, page } = await launch({ TF_USER_DATA: BAD, TF_NO_DIALOGS: '1' }));
+  await page.waitForSelector('text=No Questions Yet');
+  await page.click('text=Load Example Workspace'); await page.waitForFunction(() => location.hash === '#p-pnw1'); await wait(500);
+  await appx.close();
+  const kept = fs.readdirSync(BAD).filter(f => f.startsWith('workspace.unreadable-'));
+  ok(kept.length === 1 && fs.readFileSync(path.join(BAD, kept[0]), 'utf8').endsWith('Half a fi') && Object.keys(JSON.parse(fs.readFileSync(path.join(BAD, 'workspace.json'), 'utf8')).tf_beliefs).length === 7, 'an unreadable workspace file is kept aside before a new one is saved');
+
+  // a tampered workspace file: unexpected collections and ids are left out, the original is kept
+  const TAMP = fs.mkdtempSync(path.join(os.tmpdir(), 'tf-desk-tamp-'));
+  fs.writeFileSync(path.join(TAMP, 'workspace.json'), '{"tf_groups": {"__proto__": {"polluted": true}, "bad id!": {"name": "x"}}, "evil": {"a": {}}, "tf_sources": []}');
+  ({ appx, page } = await launch({ TF_USER_DATA: TAMP, TF_NO_DIALOGS: '1' }));
+  await page.waitForSelector('text=No Questions Yet');
+  ok(await appx.evaluate(() => ({}).polluted === undefined), 'a tampered file cannot change built-in objects');
+  await appx.close();
+  ok(fs.readdirSync(TAMP).filter(f => f.startsWith('workspace.unreadable-')).length === 1, 'the tampered file is kept aside for inspection');
+  fs.rmSync(BAD, { recursive: true, force: true }); fs.rmSync(TAMP, { recursive: true, force: true });
+
   fs.rmSync(DATA, { recursive: true, force: true });
   console.log(`\n${pass} passed, ${fail} failed`);
   if (errors.length) { console.log('\nPage errors:'); [...new Set(errors)].forEach(e => console.log('  ' + e)); }

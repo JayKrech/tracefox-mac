@@ -9,11 +9,12 @@ Please report security problems privately, not in a public issue: open the **Sec
 **What stays on your Mac**
 
 - Your workspace is one file, `~/Library/Application Support/TraceFox/workspace.json`, readable only by your macOS user account. It is not encrypted beyond what macOS does for your disk (FileVault).
+- TraceFox keeps a copy of the workspace for each of the last 7 days you opened it, in the `backups` folder next to it. If the workspace file cannot be read, it is copied aside untouched before anything new is saved.
 - Your Anthropic API key is encrypted with the macOS Keychain. The app's pages never receive the key; only the app's main process reads it, to sign requests to Anthropic.
 
 **What leaves your Mac**
 
-- Only requests to `api.anthropic.com`, made when you run an agent or check your key. An agent run sends the question, its beliefs, and the sources and context files that agent needs. Anthropic's terms for API data apply to that content.
+- Only requests to `api.anthropic.com`, made when you run an agent or check your key. An agent run sends the question, its beliefs, and the sources and context files that agent needs. Anthropic's terms for API data apply to that content. Before the first agent run, TraceFox says this once and asks you to confirm.
 - Nothing else: no analytics, no crash reports, no update checks.
 
 **How the app is locked down**
@@ -27,7 +28,7 @@ Please report security problems privately, not in a public issue: open the **Sec
 
 ## Limits you should know
 
-- **Agents read what you give them.** A source can contain text that tries to steer an agent ("ignore your instructions…"). The agents are told to treat sources as material, their quotes are checked word for word against the source, and nothing they propose counts until you accept it. Still, read proposals before accepting them.
-- **No automatic updates.** TraceFox does not check for new versions. Watch this repository's releases to get security fixes.
+- **Agents read what you give them.** A source can contain text that tries to steer an agent ("ignore your instructions…"). The agents are told to treat sources as material, their quotes are checked word for word against the source, and nothing they propose counts until you accept it. TraceFox flags sources and context files with typical phrases of this kind, but it cannot catch every wording. Still, read proposals before accepting them.
+- **No automatic updates.** TraceFox does not check for new versions, because that would be a second connection. **TraceFox › Check for Updates…** opens this repository's releases page in your browser; compare it with the version under About TraceFox. You can also watch the repository's releases to hear about security fixes.
 - **Builds you make yourself** with `npm run dmg` are signed ad hoc, not notarized.
 - Anyone who can use your macOS account can read your workspace file.

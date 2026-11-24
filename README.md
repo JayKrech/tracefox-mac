@@ -15,7 +15,7 @@ TraceFox is a free Mac app for product teams. You write down the decision you ar
 - **Honest confidence.** A belief is Supported, Contested or Needs Evidence. One loud interview is not enough: support has to come from more than one source.
 - **Blockers before sign-off.** TraceFox lists what stands between you and a decision you can defend.
 - **Decision records.** When you sign off, TraceFox keeps what you chose, why, and which beliefs to watch. If one of them changes, the decision is marked for review.
-- **Agents that propose, never decide.** They draft beliefs, find quotes in your sources, summarise, and suggest test plans. You accept or reject everything.
+- **Agents that propose, never decide.** They draft beliefs, find quotes in your sources, summarise, and suggest test plans. You accept or reject everything. Sources that contain instructions aimed at an AI are flagged.
 - **Projects.** Group questions, sources and context files per project.
 
 ## Install
@@ -30,10 +30,10 @@ TraceFox is free. The agents run on your own Anthropic API key, so Anthropic cha
 
 ## Privacy
 
-- **Your workspace stays on your Mac**, in `~/Library/Application Support/TraceFox/workspace.json`. File › Show Data in Finder opens the folder.
+- **Your workspace stays on your Mac**, in `~/Library/Application Support/TraceFox/workspace.json`. File › Show Data in Finder opens the folder. A copy for each of the last 7 days you used it is kept in `backups` next to it.
 - **Your API key is encrypted with the macOS Keychain** and stored next to the workspace.
-- **The app only talks to `api.anthropic.com`**, and only when you run an agent or check your key. An agent run sends the question, its beliefs, and the sources and context files that agent needs.
-- **No account, no analytics, no tracking.**
+- **The app only talks to `api.anthropic.com`**, and only when you run an agent or check your key. An agent run sends the question, its beliefs, and the sources and context files that agent needs. TraceFox tells you this once, before the first run.
+- **No account, no analytics, no tracking, no update checks.** TraceFox › Check for Updates… opens the releases page in your browser.
 
 The pages of the app have no network access at all, and text from sources or agents can never run as code. [SECURITY.md](SECURITY.md) describes how this is enforced and what the limits are. The code in this repository is the whole app, so you can check all of this yourself.
 

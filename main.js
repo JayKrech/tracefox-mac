@@ -57,17 +57,52 @@ const okId = id => typeof id === 'string' && ID.test(id) && id !== '__proto__' &
 const isDoc = d => !!d && typeof d === 'object' && !Array.isArray(d);
 // Reads the workspace file and keeps only what has the expected shape, so a damaged or
 // tampered file cannot hand the page unexpected collections or ids.
+// If anything in the file had to be left out, or the file could not be read at all, the file
+// is first copied aside untouched, so nothing is lost when the workspace is saved again.
+let keptAside = '';
 function store() {
   if (!db) {
-    const raw = readJson('workspace.json', null);
     db = Object.create(null);
-    if (isDoc(raw)) for (const col of Object.keys(raw)) {
-      if (!COL.test(col) || !isDoc(raw[col])) continue;
-      const docs = db[col] = Object.create(null);
-      for (const id of Object.keys(raw[col])) if (okId(id) && isDoc(raw[col][id])) docs[id] = raw[col][id];
+    let text = null, raw = null, damaged = false;
+    try { text = fs.readFileSync(P('workspace.json'), 'utf8'); } catch (e) { damaged = e.code !== 'ENOENT'; }
+    if (text !== null) { try { raw = JSON.parse(text); } catch (e) { damaged = true; } }
+    if (text !== null && !damaged) {
+      if (!isDoc(raw)) damaged = true;
+      else for (const col of Object.keys(raw)) {
+        if (!COL.test(col) || !isDoc(raw[col])) { damaged = true; continue; }
+        const docs = db[col] = Object.create(null);
+        for (const id of Object.keys(raw[col])) { if (okId(id) && isDoc(raw[col][id])) docs[id] = raw[col][id]; else damaged = true; }
+      }
     }
+    if (damaged) keepAside();
+    else if (text !== null) backupDaily();
   }
   return db;
+}
+function keepAside() {
+  try {
+    const name = 'workspace.unreadable-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    fs.copyFileSync(P('workspace.json'), P(name)); fs.chmodSync(P(name), 0o600);
+    keptAside = name;
+  } catch (e) { /* nothing to copy */ }
+}
+// One copy of the workspace per day it was opened, the last 7 kept, in the "backups" folder.
+const BACKUPS = 7;
+function backupDaily() {
+  try {
+    const dir = P('backups'); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const d = new Date(); const day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const file = path.join(dir, 'workspace-' + day + '.json');
+    if (!fs.existsSync(file)) { fs.copyFileSync(P('workspace.json'), file); fs.chmodSync(file, 0o600); }
+    const old = fs.readdirSync(dir).filter(f => /^workspace-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort().reverse().slice(BACKUPS);
+    old.forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* keep it */ } });
+  } catch (e) { /* a missing backup must never stop the app */ }
+}
+function tellAboutKeptFile() {
+  if (!keptAside || TEST.TF_NO_DIALOGS === '1' || !win) return;
+  const name = keptAside; keptAside = '';
+  dialog.showMessageBox(win, { type: 'warning', message: 'Part of your workspace couldn’t be read', detail: 'TraceFox opened what it could. The file as it was has been kept as “' + name + '” in the data folder, so nothing is lost.', buttons: ['OK', 'Show in Finder'], defaultId: 0 })
+    .then(r => { if (r.response === 1) shell.showItemInFolder(P(name)); });
 }
 function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(flush, 120); }
 function flush() {
@@ -141,11 +176,25 @@ listen('open:keys', fromSettings, () => shell.openExternal('https://console.anth
 
 /* ---------- agents ---------- */
 const running = new Map();
+// Before the first agent run, say once what will be sent. Declining stops the run.
+let notice = null;
+function agentNotice() {
+  if (prefs().agentNotice) return Promise.resolve(true);
+  if (!notice) {
+    const ask = TEST.TF_AGENT_NOTICE ? Promise.resolve({ response: TEST.TF_AGENT_NOTICE === 'accept' ? 0 : 1 })
+      : dialog.showMessageBox(win, { type: 'info', message: 'Agents send text to Anthropic',
+        detail: 'To do their work, agents send the question, its beliefs, and the sources and context files they read to Anthropic, using your API key. Nothing else leaves your Mac.\n\nIf your sources contain personal data, check that you may share it this way.',
+        buttons: ['Send to Anthropic', 'Cancel'], defaultId: 0, cancelId: 1 });
+    notice = ask.then(r => { notice = null; if (r.response !== 0) return false; setPref('agentNotice', true); return true; }, () => { notice = null; return false; });
+  }
+  return notice;
+}
 listen('ai:abort', fromPage, (_e, id) => { const c = running.get(id); if (c) c.abort(); });
 handle('ai:json', fromPage, async (_e, id, prompt) => {
   if (typeof id !== 'string' || typeof prompt !== 'string') throw new Error('invalid request');
   const ctl = new AbortController(); running.set(id, ctl);
   try {
+    if ((FAKE_AI ? !!TEST.TF_AGENT_NOTICE : !!getKey()) && !(await agentNotice())) throw { code: 'cancelled', message: 'Stopped' };
     if (FAKE_AI) return { ok: true, json: await fakeAgent(prompt, ctl.signal) };
     const out = await ai.completeJson({ key: getKey(), model: prefs().model, prompt, signal: ctl.signal });
     return { ok: true, json: out.json };
@@ -179,7 +228,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false, spellcheck: true },
   });
   win.loadFile(PAGE_FILE);
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => { win.show(); tellAboutKeptFile(); });
   const keep = () => { if (!win.isMaximized() && !win.isFullScreen()) try { writeJsonAtomic('window.json', win.getBounds()); } catch (e) { /* ignore */ } };
   win.on('resize', debounce(keep, 400)); win.on('move', debounce(keep, 400));
   win.on('closed', () => { win = null; });
@@ -245,11 +294,16 @@ async function selfTest() {
 function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
 /* ---------- menu ---------- */
+// The app itself never looks for updates. This opens the releases page in the browser, where
+// the newest version is listed next to the one shown under About TraceFox.
+const REPO = 'https://github.com/JayKrech/tracefox-mac';
+const RELEASES = REPO + '/releases/latest';
 const send = a => () => { const w = win || BrowserWindow.getFocusedWindow(); if (w && !w.isDestroyed()) w.webContents.send('menu', a); };
 function buildMenu() {
   const t = [
     ...(IS_MAC ? [{ label: 'TraceFox', submenu: [
-      { role: 'about', label: 'About TraceFox' }, { type: 'separator' },
+      { role: 'about', label: 'About TraceFox' },
+      { label: 'Check for Updates…', click: () => shell.openExternal(RELEASES) }, { type: 'separator' },
       { label: 'Settings…', accelerator: 'Cmd+,', click: openSettings }, { type: 'separator' },
       { role: 'services' }, { type: 'separator' },
       { role: 'hide', label: 'Hide TraceFox' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
@@ -278,7 +332,10 @@ function buildMenu() {
       ...(app.isPackaged ? [] : [{ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' }])] },
     { role: 'windowMenu' },
     { role: 'help', submenu: [
+      ...(IS_MAC ? [] : [{ label: 'Check for Updates…', click: () => shell.openExternal(RELEASES) }]),
       { label: 'Get an Anthropic API Key', click: () => shell.openExternal('https://console.anthropic.com/settings/keys') },
+      { label: 'How TraceFox Protects Your Data', click: () => shell.openExternal(REPO + '/blob/main/SECURITY.md') },
+      { label: 'Report a Problem', click: () => shell.openExternal(REPO + '/issues') },
       { label: 'TraceFox Website', click: () => shell.openExternal('https://tracefox.app') }] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(t));
@@ -289,7 +346,7 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.setAboutPanelOptions({ applicationName: 'TraceFox', applicationVersion: app.getVersion(), copyright: '© 2026 Jakob Ehe', credits: 'Evidence for every product decision.' });
-  app.whenReady().then(() => { lockDown(); buildMenu(); createWindow(); if (SELF_TEST) selfTest(); });
+  app.whenReady().then(() => { lockDown(); store(); buildMenu(); createWindow(); if (SELF_TEST) selfTest(); });
   app.on('activate', () => { if (!win) createWindow(); });
   app.on('before-quit', flush);
   app.on('window-all-closed', () => { flush(); if (!IS_MAC) app.quit(); });

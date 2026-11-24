@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-aEu7/pweN/d1Qyavvr21QbdmQ3kO0CFh/RhHsSmgGNQ='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uiTsg/Ga2YwO51f34448ROZWiaRkBxBl2iHZF4Nah9Q='; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TraceFox</title>
 <style>
@@ -192,6 +192,7 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3.5px var(--ring)}
 .rstrip .s2{margin-left:auto;width:12px;height:12px;color:var(--label3)}
 .infobar{display:flex;align-items:center;gap:8px;padding:7px 16px;background:var(--orange-tint);color:var(--label);font-size:12px;border-bottom:.5px solid var(--sep);flex:none}
 .infobar svg{width:15px;height:15px;color:var(--orange)}
+.steer{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border-radius:9px;background:var(--orange-tint);margin:12px 0 0;font-size:12px;line-height:1.4}.steer svg{flex:none;margin-top:1px}
 .notice{display:flex;align-items:center;gap:9px;padding:8px 8px 8px 12px;border-radius:9px;background:var(--purple-tint);margin:18px 0 0;font-size:13px}
 .notice svg{width:16px;height:16px;color:var(--purple)}
 .notice .btn{margin-left:auto}
@@ -575,6 +576,20 @@ html{height:auto;overflow:visible}
 {
 const $=(s,r=document)=>r.querySelector(s);
 const N=v=>Number(v)||0;
+/* Text that talks to an AI instead of describing something: a sign that a source tries to steer the agents. */
+const STEER=[/\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|your|system)\b[^.\n]{0,20}\b(instructions?|prompts?|rules|guidelines)\b/i,
+  /\b(system prompt|developer message)\b/i,
+  /\byou are (now )?(an?|the) (ai|assistant|language model|llm|chatbot)\b/i,
+  /\bas an? (ai|large language model)\b/i,
+  /\b(do not|don't|never) (tell|reveal|mention|inform) (this to )?(the )?(user|human|reader)\b/i,
+  /\bnew instructions?\s*:/i,
+  /<\/?(system|instructions?|assistant)>/i,
+  /\b(mark|rate|classify|label|treat) (this|every|all|the)\b[^.\n]{0,40}\bas (supported|strong|verified|true)\b/i,
+  /\b(ignoriere|missachte|vergiss)\b[^.\n]{0,40}\b(anweisungen|instruktionen|vorgaben|regeln)\b/i,
+  /\bdu bist (jetzt )?(eine?|der|die) (ki|assistent|sprachmodell)\b/i];
+const steerMemo=new Map();
+function steers(x){if(!x)return '';const t=String(x.text||'');const k=(x.id||'')+'|'+t.length;if(steerMemo.has(k))return steerMemo.get(k);let hit='';for(const r of STEER){const m=t.match(r);if(m){hit=m[0].replace(/\s+/g,' ').slice(0,70);break}}if(steerMemo.size>500)steerMemo.clear();steerMemo.set(k,hit);return hit}
+const steerNote=(x,what)=>{const h=steers(x);return h?`<p class="steer" role="note">${I.warnFill}<span>This ${what} contains text that reads like instructions to an AI: “${esc(h)}”. Agents treat it as material, never as instructions. Read what they propose from it before you accept.</span></p>`:''};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clone=o=>JSON.parse(JSON.stringify(o));
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -1055,9 +1070,9 @@ function sourcesView(){
   if(!all.length)return `<div class="es"><div>${I.doc.replace('<svg','<svg class="big"')}<h2>No Sources</h2><p>Paste an interview transcript, a support-ticket export or analytics notes, or upload a .txt, .md or .csv file.</p><div class="row">${driveOn?`<button class="btn" data-a="importDrive" ${canWrite?'':'disabled'}>Import from Google Drive…</button>`:''}<button class="btn def" data-a="addSource" ${canWrite?'':'disabled'}>Add Source…</button></div></div></div>`;
   const s=S.sources[UI.sid];const ai=canWrite&&aiOn&&!busy?'':'disabled';const cp=lastPid&&S.projects[lastPid]?lastPid:(projList()[0]||{}).id;
   const counts=id=>{let a=0,p=0;Object.values(S.links).forEach(l=>{if(l.sourceId===id){if(l.status==='accepted')a++;else if(l.status==='proposed')p++}});return [a,p]};
-  const list=ss.length?ss.map(x=>{const [a,p]=counts(x.id);const on=x.id===UI.sid;return `<a class="litem sitem${on?' on':''}" href="#s-${esc(x.id)}" data-menu="source" data-id="${esc(x.id)}" role="option" aria-selected="${on}"><span class="dot" style="background:${srcAge(x)>STALE_DAYS?'var(--orange)':'var(--label3)'}"></span><b>${esc(x.title)}</b><p>${esc(cut(x.text.replace(/\s+/g,' '),110))}</p><div class="lm"><span>${esc(x.type)}${x.segment?', '+esc(x.segment):''}, ${esc(fmtShort(x.date))}${srcAge(x)>STALE_DAYS?', stale':''}${SG()&&!(x.groupId&&S.groups[x.groupId])?', shared':''}</span><span>${plural(a,'link')}${p?', '+p+' proposed':''}</span></div></a>`}).join(''):'<p class="empty-row">No matches</p>';
+  const list=ss.length?ss.map(x=>{const [a,p]=counts(x.id);const on=x.id===UI.sid;return `<a class="litem sitem${on?' on':''}" href="#s-${esc(x.id)}" data-menu="source" data-id="${esc(x.id)}" role="option" aria-selected="${on}"><span class="dot" style="background:${srcAge(x)>STALE_DAYS?'var(--orange)':'var(--label3)'}"></span><b>${esc(x.title)}</b><p>${esc(cut(x.text.replace(/\s+/g,' '),110))}</p><div class="lm"><span>${esc(x.type)}${x.segment?', '+esc(x.segment):''}, ${esc(fmtShort(x.date))}${srcAge(x)>STALE_DAYS?', stale':''}${SG()&&!(x.groupId&&S.groups[x.groupId])?', shared':''}${steers(x)?', addresses an AI':''}</span><span>${plural(a,'link')}${p?', '+p+' proposed':''}</span></div></a>`}).join(''):'<p class="empty-row">No matches</p>';
   const scopeOpts=projList().map(p=>`<option value="${esc(p.id)}"${(UI.scope||cp)===p.id?' selected':''}>Beliefs in “${esc(cut(p.question,40))}”</option>`).join('')+`<option value="all"${UI.scope==='all'?' selected':''}>Every Belief in the Ledger</option>`;
-  const det=s?`<article class="rd"><h2>${esc(s.title)}</h2><div class="emeta"><span>${esc(s.type)}: ${TYPES[s.type]??5} points per moderate passage</span><span>${esc(fmtDate(s.date))}</span><span>${s.text.length.toLocaleString('en-GB')} characters</span>${s.segment?`<span>${esc(s.segment)}</span>`:''}${groupList().length?`<span>${s.groupId&&S.groups[s.groupId]?esc(S.groups[s.groupId].name):'Shared with all projects'}</span>`:''}${srcAge(s)>STALE_DAYS?'<span class="cap orange">Older than 180 days, counts half</span>':''}${s.origin&&/^https:\/\//.test(s.origin.url)?`<a href="${esc(s.origin.url)}" target="_blank" rel="noopener">Open in Google Drive</a>`:''}${s.truncated?'<span class="cap orange">Cut to 150,000 characters</span>':''}</div>
+  const det=s?`<article class="rd"><h2>${esc(s.title)}</h2><div class="emeta"><span>${esc(s.type)}: ${TYPES[s.type]??5} points per moderate passage</span><span>${esc(fmtDate(s.date))}</span><span>${s.text.length.toLocaleString('en-GB')} characters</span>${s.segment?`<span>${esc(s.segment)}</span>`:''}${groupList().length?`<span>${s.groupId&&S.groups[s.groupId]?esc(S.groups[s.groupId].name):'Shared with all projects'}</span>`:''}${srcAge(s)>STALE_DAYS?'<span class="cap orange">Older than 180 days, counts half</span>':''}${s.origin&&/^https:\/\//.test(s.origin.url)?`<a href="${esc(s.origin.url)}" target="_blank" rel="noopener">Open in Google Drive</a>`:''}${s.truncated?'<span class="cap orange">Cut to 150,000 characters</span>':''}</div>${steerNote(s,'source')}
 <div class="scan"><label for="scope">Scan Against:</label><select id="scope" class="pop" data-c="scope">${scopeOpts}</select><button class="btn def" data-a="scanSource" data-id="${esc(s.id)}" ${ai}>Find Evidence</button></div>
 <div class="legend"><span><i style="background:var(--green-tint);box-shadow:inset 0 -1.5px 0 var(--green)"></i>Supports</span><span><i style="background:var(--red-tint);box-shadow:inset 0 -1.5px 0 var(--red)"></i>Contradicts</span><span><i style="background:var(--purple-tint);box-shadow:inset 0 -1.5px 0 var(--purple)"></i>Proposed</span><span>Select a passage to link it to a belief.</span></div>
 <div class="rtext" id="rtext">${highlighted(s)}</div></article>`:'';
@@ -1553,7 +1568,7 @@ const ACT={
   toggleGroup:d=>{if(UI.col[d.g])delete UI.col[d.g];else UI.col[d.g]=1;savePanes();render()},
   moreGroup:(d,el)=>{const r=el.getBoundingClientRect();openMenu(menuFor('group',d),r.right-230,r.bottom+4)},
   addContext:d=>{const gid=d.g||d.p;if(S.groups[gid])openDlg(dlgContext(gid))},
-  viewFile:d=>{const f=S.files[d.id];if(!f)return;const g=S.groups[f.groupId]||{};openDlg(`<div class="sh"><h2>${esc(f.title)}</h2><p class="sub">Context file in “${esc(cut(g.name||'',50))}”, ${Math.round(String(f.text||'').length/100)/10}k characters${f.truncated?', cut to 150,000':''}.</p><div class="ctxtext" tabindex="0">${esc(f.text)}</div></div><div class="sf"><button type="button" class="btn def" data-a="close">Done</button></div>`)},
+  viewFile:d=>{const f=S.files[d.id];if(!f)return;const g=S.groups[f.groupId]||{};openDlg(`<div class="sh"><h2>${esc(f.title)}</h2><p class="sub">Context file in “${esc(cut(g.name||'',50))}”, ${Math.round(String(f.text||'').length/100)/10}k characters${f.truncated?', cut to 150,000':''}.</p>${steerNote(f,'file')}<div class="ctxtext" tabindex="0">${esc(f.text)}</div></div><div class="sf"><button type="button" class="btn def" data-a="close">Done</button></div>`)},
   removeFile:async d=>{const f=S.files[d.id];if(!f)return;const keep=clone(f);await remove('files',d.id);toast('Context file removed.',()=>save('files',keep.id,keep))},
   editProject:d=>openDlg(dlgProject(S.projects[d.p])),
   deleteProject:d=>{const p=S.projects[d.p];confirmDlg(`Delete “${esc(cut(p.question,70))}”?`,'Its accepted beliefs and evidence stay in the ledger. Unreviewed proposals for it are discarded.','Delete',async()=>{for(const b of Object.values(S.beliefs))if((b.projectIds||[]).includes(d.p)){if(b.status==='proposed'&&b.projectIds.length===1)await remove('beliefs',b.id);else await upd('beliefs',b.id,x=>{x.projectIds=x.projectIds.filter(i=>i!==d.p)})}await remove('projects',d.p);lastPid=null;location.hash='#ledger';toast('Question deleted.')},true)},
