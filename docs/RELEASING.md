@@ -12,21 +12,15 @@ which always points to the newest release. The link only works while the reposit
 
 ## One-time setup
 
-You need a paid Apple Developer membership. All five values below go into the repository under **Settings › Secrets and variables › Actions › New repository secret**. Nobody can read a secret back once it is saved, not even you.
+You need a paid Apple Developer membership. All four values below go into the repository under **Settings › Secrets and variables › Actions › New repository secret**. Nobody can read a secret back once it is saved, not even you.
 
 ### 1. The Developer ID certificate
 
-1. If you do not have one yet: in Xcode, open **Settings › Accounts**, select your team, choose **Manage Certificates**, then **+ › Developer ID Application**. Only the Account Holder of the team can create it.
-2. Open **Keychain Access**, choose the **login** keychain and **My Certificates**. Find **Developer ID Application: Your Name (TEAMID)**.
-3. Right-click it, choose **Export**, save it as `DeveloperID.p12` on your Desktop and give it a password.
-4. Copy the file as text:
-   ```sh
-   base64 -i ~/Desktop/DeveloperID.p12 | pbcopy
-   ```
-5. Save two secrets:
-   - `MACOS_CERTIFICATE_P12_BASE64`: paste from the clipboard
-   - `MACOS_CERTIFICATE_PASSWORD`: the password from step 3
-6. Delete `DeveloperID.p12` from your Desktop.
+1. Create a **Developer ID Application** certificate at <https://developer.apple.com/account/resources/certificates/add> (only the Account Holder can) and install it in your login keychain.
+2. Double-click `scripts/export-certificate.command`. It asks for your Mac password, copies only the Developer ID certificate and its key from the keychain, and puts the result on the clipboard.
+3. Save it as the secret `MACOS_CERTIFICATE_P12_BASE64`.
+
+The export uses the fixed password `tracefox`. That is deliberate: the certificate is only ever stored as an encrypted GitHub secret, and one value to paste is far less error-prone than two that must match.
 
 ### 2. Notarization
 
