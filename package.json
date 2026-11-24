@@ -5,15 +5,17 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/ai.test.cjs",
-    "test:e2e": "node test/app.test.cjs",
+    "test": "node test/ai.test.cjs && node test/csp.test.cjs",
+    "test:e2e": "node test/app.test.cjs && node test/xss.test.cjs",
     "package:mac": "node scripts/package-mac.mjs",
     "dmg": "bash scripts/build-dmg.sh",
-    "release:mac": "bash scripts/release-mac.sh"
+    "release:mac": "bash scripts/release-mac.sh",
+    "csp": "node scripts/update-csp.mjs"
   },
   "author": "Jakob Ehe",
   "license": "FSL-1.1-MIT",
   "devDependencies": {
+    "@electron/fuses": "^2.1.3",
     "@electron/packager": "^20.3.0",
     "electron": "^45.4.1"
   },

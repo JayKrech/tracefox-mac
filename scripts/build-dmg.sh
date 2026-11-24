@@ -62,6 +62,12 @@ echo; echo "== 3/4 Signing (ad hoc)"
 codesign --force --deep --sign - "$APP" || fail "codesign did not finish."
 codesign --verify --deep --strict "$APP" || fail "The signature did not verify."
 
+# Start the packaged app once in self-test mode: it must load its page, reach its storage and
+# be cut off from the network. ELECTRON_RUN_AS_NODE is set on purpose: a correctly locked app
+# ignores it, an unlocked one would start as plain Node.js and fail here.
+node node_modules/@electron/fuses/dist/bin.js read --app "$APP" | grep -q "RunAsNode is Disabled" || fail "The app's build-time switches are not locked."
+ELECTRON_RUN_AS_NODE=1 "$APP/Contents/MacOS/TraceFox" --self-test || fail "The packaged app did not pass its self-test."
+
 echo; echo "== 4/4 Creating the disk image"
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/" || fail "Could not copy the app."

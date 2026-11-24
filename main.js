@@ -2,15 +2,41 @@
 // Data lives in a JSON file in the app's support folder; agents call the Anthropic API
 // with the user's own key, which is encrypted with the macOS Keychain (safeStorage).
 'use strict';
-const { app, BrowserWindow, Menu, ipcMain, shell, safeStorage, nativeTheme, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, safeStorage, nativeTheme, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { fileURLToPath } = require('url');
 const ai = require('./ai');
 
-if (process.env.TF_USER_DATA) app.setPath('userData', process.env.TF_USER_DATA);
+// Test switches. They only work when the app is run from source, never in the packaged app.
+const DEV = !app.isPackaged;
+const TEST = DEV ? process.env : {};
+if (TEST.TF_USER_DATA) app.setPath('userData', TEST.TF_USER_DATA);
 app.setName('TraceFox');
 const IS_MAC = process.platform === 'darwin';
-const FAKE_AI = process.env.TF_FAKE_AI === '1';
+const FAKE_AI = TEST.TF_FAKE_AI === '1';
+const PLAIN_KEY = TEST.TF_PLAIN_KEY === '1';
+
+// "TraceFox --self-test" starts the app on an empty, temporary workspace, checks that the page
+// loaded, can reach its storage and cannot reach the network, prints the result and quits.
+// The build uses it to check the packaged app. It never touches the real workspace or the key.
+const SELF_TEST = process.argv.includes('--self-test');
+if (SELF_TEST) app.setPath('userData', fs.mkdtempSync(path.join(require('os').tmpdir(), 'tracefox-selftest-')));
+
+// The packaged app does not start with a debugging port open.
+if (!DEV && process.argv.some(a => /^--(remote-debugging|inspect)/.test(a))) app.exit(1);
+
+/* ---------- who is calling ---------- */
+// Each window may only use its own channels. A request counts as coming from a page when
+// it was sent by that page's own file, loaded from inside the app.
+const APP_DIR = __dirname.normalize('NFC');
+const PAGE_FILE = path.join(APP_DIR, 'app', 'index.html');
+const SETTINGS_FILE = path.join(APP_DIR, 'settings.html');
+function fileOf(url) { try { const u = new URL(String(url)); if (u.protocol !== 'file:') return ''; u.hash = ''; u.search = ''; return fileURLToPath(u).normalize('NFC'); } catch (e) { return ''; } }
+const fromPage = e => !!e.senderFrame && fileOf(e.senderFrame.url) === PAGE_FILE;
+const fromSettings = e => !!e.senderFrame && fileOf(e.senderFrame.url) === SETTINGS_FILE;
+function handle(channel, allowed, fn) { ipcMain.handle(channel, (e, ...args) => { if (!allowed(e)) throw new Error('not allowed'); return fn(e, ...args); }); }
+function listen(channel, allowed, fn) { ipcMain.on(channel, (e, ...args) => { if (allowed(e)) fn(e, ...args); }); }
 
 /* ---------- files ---------- */
 const P = name => path.join(app.getPath('userData'), name);
@@ -18,7 +44,7 @@ function readJson(name, fallback) { try { return JSON.parse(fs.readFileSync(P(na
 function writeJsonAtomic(name, data) {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
   const tmp = P(name + '.tmp');
-  fs.writeFileSync(tmp, JSON.stringify(data));
+  fs.writeFileSync(tmp, JSON.stringify(data), { mode: 0o600 });
   fs.renameSync(tmp, P(name));
 }
 
@@ -27,10 +53,19 @@ let db = null;
 let saveTimer = null;
 const COL = /^tf_[a-z]{1,20}$/;
 const ID = /^[A-Za-z0-9_-]{1,100}$/;
+const okId = id => typeof id === 'string' && ID.test(id) && id !== '__proto__' && id !== 'constructor' && id !== 'prototype';
+const isDoc = d => !!d && typeof d === 'object' && !Array.isArray(d);
+// Reads the workspace file and keeps only what has the expected shape, so a damaged or
+// tampered file cannot hand the page unexpected collections or ids.
 function store() {
   if (!db) {
-    db = readJson('workspace.json', null);
-    if (!db || typeof db !== 'object') db = {};
+    const raw = readJson('workspace.json', null);
+    db = Object.create(null);
+    if (isDoc(raw)) for (const col of Object.keys(raw)) {
+      if (!COL.test(col) || !isDoc(raw[col])) continue;
+      const docs = db[col] = Object.create(null);
+      for (const id of Object.keys(raw[col])) if (okId(id) && isDoc(raw[col][id])) docs[id] = raw[col][id];
+    }
   }
   return db;
 }
@@ -43,20 +78,22 @@ function flush() {
 }
 function broadcast(channel, payload) { BrowserWindow.getAllWindows().forEach(w => { if (!w.isDestroyed()) w.webContents.send(channel, payload); }); }
 
-ipcMain.handle('db:snapshot', (_e, col) => {
-  if (!COL.test(col)) throw new Error('invalid collection');
+let snapshots = 0;
+handle('db:snapshot', fromPage, (_e, col) => {
+  if (typeof col !== 'string' || !COL.test(col)) throw new Error('invalid collection');
+  snapshots++;
   return Object.entries(store()[col] || {}).map(([id, data]) => ({ id, data }));
 });
-ipcMain.handle('db:set', (_e, col, id, data) => {
-  if (!COL.test(col) || !ID.test(id)) throw new Error('invalid path');
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid document');
+handle('db:set', fromPage, (_e, col, id, data) => {
+  if (typeof col !== 'string' || !COL.test(col) || !okId(id)) throw new Error('invalid path');
+  if (!isDoc(data)) throw new Error('invalid document');
   if (JSON.stringify(data).length > 2 * 1024 * 1024) throw new Error('document too large');
-  const s = store(); (s[col] = s[col] || {})[id] = data;
+  const s = store(); (s[col] = s[col] || Object.create(null))[id] = data;
   saveSoon(); broadcast('db:changed', col);
   return true;
 });
-ipcMain.handle('db:delete', (_e, col, id) => {
-  if (!COL.test(col) || !ID.test(id)) throw new Error('invalid path');
+handle('db:delete', fromPage, (_e, col, id) => {
+  if (typeof col !== 'string' || !COL.test(col) || !okId(id)) throw new Error('invalid path');
   const s = store(); if (s[col]) delete s[col][id];
   saveSoon(); broadcast('db:changed', col);
   return true;
@@ -70,41 +107,43 @@ function getKey() {
   try {
     const buf = fs.readFileSync(P('key.bin'));
     if (secureOk()) return safeStorage.decryptString(buf);
-    if (process.env.TF_PLAIN_KEY === '1') return buf.toString('utf8');
+    if (PLAIN_KEY) return buf.toString('utf8');
   } catch (e) { /* no key */ }
   return '';
 }
 function saveKey(key) {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
-  if (secureOk()) fs.writeFileSync(P('key.bin'), safeStorage.encryptString(key));
-  else if (process.env.TF_PLAIN_KEY === '1') fs.writeFileSync(P('key.bin'), key, 'utf8');
+  if (secureOk()) fs.writeFileSync(P('key.bin'), safeStorage.encryptString(key), { mode: 0o600 });
+  else if (PLAIN_KEY) fs.writeFileSync(P('key.bin'), key, { encoding: 'utf8', mode: 0o600 });
   else throw new Error('Secure storage isn’t available on this computer, so the key can’t be saved.');
+  try { fs.chmodSync(P('key.bin'), 0o600); } catch (e) { /* best effort */ }
 }
 function removeKey() { try { fs.unlinkSync(P('key.bin')); } catch (e) { /* already gone */ } }
 const keyShape = k => /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k);
 
-ipcMain.handle('key:has', () => FAKE_AI || !!getKey());
-ipcMain.handle('settings:state', () => {
+handle('key:has', fromPage, () => FAKE_AI || !!getKey());
+handle('settings:state', fromSettings, () => {
   const k = getKey();
   return { hasKey: !!k, keyHint: k ? k.slice(0, 10) + '…' + k.slice(-4) : '', model: prefs().model || ai.MODELS[0].id, models: ai.MODELS, dataPath: app.getPath('userData'), version: app.getVersion(), secure: secureOk() };
 });
-ipcMain.handle('key:save', async (_e, key) => {
+handle('key:save', fromSettings, async (_e, key) => {
   key = String(key || '').trim();
   if (!keyShape(key)) return { ok: false, error: { code: 'invalid_key', message: 'That doesn’t look like an Anthropic API key. Keys start with “sk-ant-”.' } };
   try { saveKey(key); } catch (e) { return { ok: false, error: { code: 'storage', message: e.message } }; }
   broadcast('key:changed', true);
   return { ok: true };
 });
-ipcMain.handle('key:test', (_e, key) => ai.testKey({ key: key ? String(key).trim() : getKey() }));
-ipcMain.handle('key:remove', () => { removeKey(); broadcast('key:changed', FAKE_AI); return { ok: true }; });
-ipcMain.handle('model:set', (_e, id) => { if (ai.MODELS.some(m => m.id === id)) setPref('model', id); return { ok: true }; });
-ipcMain.on('data:reveal', () => { flush(); shell.showItemInFolder(P('workspace.json')); });
-ipcMain.on('open:keys', () => shell.openExternal('https://console.anthropic.com/settings/keys'));
+handle('key:test', fromSettings, (_e, key) => ai.testKey({ key: key ? String(key).trim() : getKey() }));
+handle('key:remove', fromSettings, () => { removeKey(); broadcast('key:changed', FAKE_AI); return { ok: true }; });
+handle('model:set', fromSettings, (_e, id) => { if (ai.MODELS.some(m => m.id === id)) setPref('model', id); return { ok: true }; });
+listen('data:reveal', fromSettings, () => { flush(); shell.showItemInFolder(P('workspace.json')); });
+listen('open:keys', fromSettings, () => shell.openExternal('https://console.anthropic.com/settings/keys'));
 
 /* ---------- agents ---------- */
 const running = new Map();
-ipcMain.on('ai:abort', (_e, id) => { const c = running.get(id); if (c) c.abort(); });
-ipcMain.handle('ai:json', async (_e, id, prompt) => {
+listen('ai:abort', fromPage, (_e, id) => { const c = running.get(id); if (c) c.abort(); });
+handle('ai:json', fromPage, async (_e, id, prompt) => {
+  if (typeof id !== 'string' || typeof prompt !== 'string') throw new Error('invalid request');
   const ctl = new AbortController(); running.set(id, ctl);
   try {
     if (FAKE_AI) return { ok: true, json: await fakeAgent(prompt, ctl.signal) };
@@ -121,7 +160,7 @@ function fakeAgent(prompt, signal) {
     const t = setTimeout(() => {
       if (prompt.includes('Framer agent')) resolve({ beliefs: [{ statement: 'Admins wait for a colleague to confirm roles before inviting.', loadBearing: true, why: 'Desktop bridge test.', test: 'Interview 5 admins', passIf: '4 of 5 mention roles' }], reuse: [], metric: '' });
       else resolve({});
-    }, Number(process.env.TF_FAKE_DELAY || 200));
+    }, Number(TEST.TF_FAKE_DELAY || 200));
     signal.addEventListener('abort', () => { clearTimeout(t); reject({ code: 'cancelled', message: 'Stopped' }); }, { once: true });
   });
 }
@@ -137,14 +176,13 @@ function createWindow() {
     titleBarStyle: IS_MAC ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 18, y: 19 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false, spellcheck: true },
   });
-  win.loadFile(path.join(__dirname, 'app', 'index.html'));
+  win.loadFile(PAGE_FILE);
   win.once('ready-to-show', () => win.show());
   const keep = () => { if (!win.isMaximized() && !win.isFullScreen()) try { writeJsonAtomic('window.json', win.getBounds()); } catch (e) { /* ignore */ } };
   win.on('resize', debounce(keep, 400)); win.on('move', debounce(keep, 400));
   win.on('closed', () => { win = null; });
-  guard(win.webContents);
 }
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.focus(); return; }
@@ -152,20 +190,57 @@ function openSettings() {
     width: 520, height: 600, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
     title: 'Settings', show: false, parent: undefined,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#2a2a2a' : '#ececec',
-    webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false },
   });
-  settingsWin.loadFile(path.join(__dirname, 'settings.html'));
+  settingsWin.loadFile(SETTINGS_FILE);
   settingsWin.once('ready-to-show', () => settingsWin.show());
   settingsWin.on('closed', () => { settingsWin = null; });
-  guard(settingsWin.webContents);
 }
-ipcMain.on('settings:open', openSettings);
-ipcMain.on('settings:close', () => { if (settingsWin) settingsWin.close(); });
+listen('settings:open', fromPage, openSettings);
+listen('settings:close', fromSettings, () => { if (settingsWin) settingsWin.close(); });
 
-// Keep the app on its own pages; open web links in the browser.
+// Each window stays on the page it was opened with. Web links open in the browser, and only
+// https links; nothing else on the computer can be opened from a page.
+function openLink(url) { try { if (new URL(String(url)).protocol === 'https:') shell.openExternal(String(url)); } catch (e) { /* not a link */ } }
 function guard(wc) {
-  wc.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
-  wc.on('will-navigate', (e, url) => { if (!url.startsWith('file://')) { e.preventDefault(); if (/^https:\/\//.test(url)) shell.openExternal(url); } });
+  wc.setWindowOpenHandler(({ url }) => { openLink(url); return { action: 'deny' }; });
+  const stay = (e, url) => { const f = fileOf(url); if (f && f === fileOf(wc.getURL())) return; e.preventDefault(); openLink(url); };
+  wc.on('will-navigate', stay);
+  wc.on('will-redirect', stay);
+  wc.on('will-attach-webview', e => e.preventDefault());
+}
+
+// The pages themselves get no network access and no device permissions. Requests to Anthropic
+// are made by this process (ai.js), never by a page.
+function lockDown() {
+  const ses = session.defaultSession;
+  const ownFile = url => { const f = fileOf(url); return !!f && f.startsWith(APP_DIR + path.sep); };
+  ses.webRequest.onBeforeRequest((details, done) => done({ cancel: !(ownFile(details.url) || /^(devtools|data|blob):/i.test(details.url)) }));
+  // The only permission a page gets is copying text to the clipboard (the Copy commands).
+  const mayCopy = (wc, permission) => permission === 'clipboard-sanitized-write' && !!wc && fileOf(wc.getURL()) === PAGE_FILE;
+  ses.setPermissionRequestHandler((wc, permission, done) => done(mayCopy(wc, permission)));
+  ses.setPermissionCheckHandler((wc, permission) => mayCopy(wc, permission));
+  app.on('web-contents-created', (_e, wc) => guard(wc));
+}
+async function selfTest() {
+  const out = {};
+  const finish = () => { const ok = Object.values(out).every(v => v === true); console.log('SELF-TEST ' + (ok ? 'OK' : 'FAILED') + ' ' + JSON.stringify(out)); try { fs.rmSync(app.getPath('userData'), { recursive: true, force: true }); } catch (e) { /* temp folder */ } app.exit(ok ? 0 : 1); };
+  setTimeout(() => { out.timeout = false; finish(); }, 30000);
+  try {
+    await new Promise(r => win.webContents.once('did-finish-load', r));
+    for (let i = 0; i < 100 && snapshots < 1; i++) await new Promise(r => setTimeout(r, 100));
+    const js = code => win.webContents.executeJavaScript(code, true);
+    out.pageLoaded = fileOf(win.webContents.getURL()) === PAGE_FILE;
+    out.storageReached = snapshots > 0 && (await js('window.tfBridge.dbSnapshot("tf_projects").then(r => Array.isArray(r), () => false)')) === true;
+    out.bridgeAsExpected = (await js('Object.keys(window.tfBridge).sort().join(",")')) === 'aiAbort,aiStart,dbDelete,dbSet,dbSnapshot,hasKey,host,onDbChanged,onKeyChanged,onMenu,openSettings';
+    out.noKeyOnFreshStart = (await js('window.tfBridge.hasKey()')) === false;
+    out.noNodeInPage = (await js('typeof require === "undefined" && typeof process === "undefined"')) === true;
+    out.networkBlocked = (await js('fetch("https://example.com/", { mode: "no-cors" }).then(() => false, () => true)')) === true;
+    out.imageBlocked = (await js('new Promise(r => { const i = new Image(); i.onload = () => r(false); i.onerror = () => r(true); i.src = "https://example.com/x.png"; setTimeout(() => r(true), 4000); })')) === true;
+    out.inlineScriptBlocked = (await js('new Promise(r => { window.__t = 0; const d = document.createElement("div"); d.innerHTML = "<img src=x onerror=\\"window.__t=1\\">"; document.body.appendChild(d); setTimeout(() => { d.remove(); r(window.__t === 0); }, 600); })')) === true;
+    out.settingsClosedToPage = (await js('typeof window.tfSettings === "undefined"')) === true;
+  } catch (e) { out.error = String(e && e.message || e); }
+  finish();
 }
 function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
@@ -214,7 +289,7 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.setAboutPanelOptions({ applicationName: 'TraceFox', applicationVersion: app.getVersion(), copyright: '© 2026 Jakob Ehe', credits: 'Evidence for every product decision.' });
-  app.whenReady().then(() => { buildMenu(); createWindow(); });
+  app.whenReady().then(() => { lockDown(); buildMenu(); createWindow(); if (SELF_TEST) selfTest(); });
   app.on('activate', () => { if (!win) createWindow(); });
   app.on('before-quit', flush);
   app.on('window-all-closed', () => { flush(); if (!IS_MAC) app.quit(); });

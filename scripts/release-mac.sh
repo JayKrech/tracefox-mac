@@ -51,6 +51,12 @@ xcrun stapler validate "$APP"
 # Gatekeeper's own verdict. Informational, because build machines can have Gatekeeper switched off.
 spctl --assess --type execute --verbose "$APP" || echo "Note: spctl did not accept the app on this machine."
 
+# Start the packaged app once in self-test mode: it must load its page, reach its storage and
+# be cut off from the network. ELECTRON_RUN_AS_NODE is set on purpose: a correctly locked app
+# ignores it, an unlocked one would start as plain Node.js and fail here.
+node node_modules/@electron/fuses/dist/bin.js read --app "$APP" | tee /dev/stderr | grep -q "RunAsNode is Disabled"
+ELECTRON_RUN_AS_NODE=1 "$APP/Contents/MacOS/TraceFox" --self-test
+
 # Disk image with the usual drag-to-Applications layout.
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"

@@ -35,7 +35,7 @@ TraceFox is free. The agents run on your own Anthropic API key, so Anthropic cha
 - **The app only talks to `api.anthropic.com`**, and only when you run an agent or check your key. An agent run sends the question, its beliefs, and the sources and context files that agent needs.
 - **No account, no analytics, no tracking.**
 
-The code in this repository is the whole app, so you can check all of this yourself.
+The pages of the app have no network access at all, and text from sources or agents can never run as code. [SECURITY.md](SECURITY.md) describes how this is enforced and what the limits are. The code in this repository is the whole app, so you can check all of this yourself.
 
 ## Build it yourself
 
@@ -66,7 +66,7 @@ How the official download is built, signed and notarized is described in [docs/R
 | `settings.html` | Settings: API key, model, data folder |
 | `app/index.html` | The TraceFox interface, built as one page |
 | `build/` | App icon, Info.plist additions, hardened-runtime entitlements |
-| `scripts/` | Packaging, the test disk image, the signed release |
+| `scripts/` | Packaging, the test disk image, the signed release, the pages' security policy |
 
 ## Tests
 
@@ -74,7 +74,9 @@ How the official download is built, signed and notarized is described in [docs/R
 npm test
 ```
 
-This runs the unit tests for the API client. `npm run test:e2e` launches the real app and drives it with a stand-in for the agents, so it needs no key and no network. It needs [Playwright](https://playwright.dev) (`npm install --no-save playwright`), and on Linux it runs under `xvfb-run`.
+This runs the unit tests for the API client and checks the pages' security policy. `npm run test:e2e` launches the real app and drives it with a stand-in for the agents, then runs the injection test: it fills every field and every agent reply with hostile markup and checks that none of it is rendered. Both need [Playwright](https://playwright.dev) (`npm install --no-save playwright`) but no key and no network, and on Linux the first runs under `xvfb-run`.
+
+Every build also starts the packaged app once with `--self-test`, which checks that the page loads, storage works and the network is blocked.
 
 ## Feedback
 
