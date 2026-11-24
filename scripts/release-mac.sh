@@ -56,7 +56,7 @@ STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 DMG="out/TraceFox-$VERSION.dmg"
-hdiutil create -volname "TraceFox" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+hdiutil create -volname "TraceFox" -srcfolder "$STAGE" -ov -format ULMO "$DMG"
 rm -rf "$STAGE"
 
 if [ -n "$KEYCHAIN" ]; then

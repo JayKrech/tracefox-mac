@@ -19,16 +19,18 @@ echo "TraceFox DMG build, $(date)"
 
 [ "$(uname -s)" = "Darwin" ] || fail "This script has to run on macOS."
 
-# Find Node: Homebrew locations, then nvm.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true; fi
-
 node_ok() {
   command -v node >/dev/null 2>&1 && node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=12)?0:1)"
 }
-if ! node_ok && command -v nvm >/dev/null 2>&1; then
-  for v in 24 23 22; do nvm use "$v" >/dev/null 2>&1 && node_ok && break; done
+# Use the Node that is already on the PATH. If it is missing or too old, look in the
+# Homebrew locations, then in nvm.
+if ! node_ok; then export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; fi
+if ! node_ok; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true; fi
+  if command -v nvm >/dev/null 2>&1; then
+    for v in 24 23 22; do nvm use "$v" >/dev/null 2>&1 && node_ok && break; done
+  fi
 fi
 if ! node_ok; then
   have="none"; command -v node >/dev/null 2>&1 && have="$(node -v)"
@@ -67,7 +69,7 @@ ln -s /Applications "$STAGE/Applications"
 NAME="TraceFox-$VERSION.dmg"
 [ "$ARCH_BUILT" = "universal" ] || NAME="TraceFox-$VERSION-$ARCH_BUILT.dmg"
 DMG="out/$NAME"
-hdiutil create -volname "TraceFox" -srcfolder "$STAGE" -ov -format UDZO "$DMG" || fail "hdiutil did not finish."
+hdiutil create -volname "TraceFox" -srcfolder "$STAGE" -ov -format ULMO "$DMG" || fail "hdiutil did not finish."
 rm -rf "$STAGE"
 hdiutil verify "$DMG" >/dev/null || fail "The disk image did not verify."
 
